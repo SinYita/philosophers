@@ -1,37 +1,65 @@
-#include <stdio.h>
-#include <pthread.h>
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   threads.c                                          :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: wedu <wedu@student.42.fr>                  +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/01/18 19:00:58 by wedu              #+#    #+#             */
+/*   Updated: 2026/01/29 13:53:43 by wedu             ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-//this is a demo to show the threads in c
+#include "philo.h"
 
-
-void *computation(void *add);
-
-int main()
+int	dead_loop(t_philo *philo)
 {
-    pthread_t  thread1;
-    pthread_t  thread2;
-
-    long value1 =1;
-    long value2 = 2;
-
-    //pthread_create(the address of thread, attributs of the thread, address of the function, parameters of functions)
-    pthread_create(&thread1,NULL,computation,(void *)&value1);
-
-     pthread_join(thread1,NULL);
-    pthread_create(&thread2,NULL,computation,(void *)&value2);
-
-    //pthread_join(thread1,NULL);
-    pthread_join(thread2,NULL);
-    return 0;
+	pthread_mutex_lock(philo->dead_lock);
+	if (*philo->dead == 1)
+		return (pthread_mutex_unlock(philo->dead_lock), 1);
+	pthread_mutex_unlock(philo->dead_lock);
+	return (0);
 }
 
-void *computation(void *add)
+void	*philo_routine(void *pointer)
 {
-    long *add_num = (long *)(add);
+	t_philo	*philo;
 
-    long sum = 0;
-    for(long i = 0;i < 1000000000;i ++)
-        sum += *add_num;
-    printf("The reuslt of addition is : %ld\n",sum);
-    return NULL;
+	philo = (t_philo *)pointer;
+	if (philo->id % 2 == 0)
+		ft_usleep(1);
+	while (!dead_loop(philo))
+	{
+		eat(philo);
+		dream(philo);
+		think(philo);
+	}
+	return (pointer);
+}
+
+int	thread_create(t_program *program, pthread_mutex_t *forks)
+{
+	pthread_t	observer;
+	int			i;
+
+	if (pthread_create(&observer, NULL, &monitor, program->philos) != 0)
+		destroy_all("Thread creation error", program, forks);
+	i = 0;
+	while (i < program->philos[0].num_of_philos)
+	{
+		if (pthread_create(&program->philos[i].thread, NULL, &philo_routine,
+				&program->philos[i]) != 0)
+			destroy_all("Thead creation error", program, forks);
+		i++;
+	}
+	i = 0;
+	if (pthread_join(observer, NULL) != 0)
+		destroy_all("Thread creation,error", program, forks);
+	while (i < program->philos[0].num_of_philos)
+	{
+		if (pthread_join(program->philos[i].thread, NULL) != 0)
+			destroy_all("Thread join error", program, forks);
+		i++;
+	}
+	return (0);
 }
